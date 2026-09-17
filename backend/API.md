@@ -1,6 +1,6 @@
 # Smart Shopping — REST API Documentation (v1)
 
-This document details the REST API specification for **Smart Shopping** across Phase 2 (Backend Foundation), Phase 3 (Data Collection Layer), Phase 4 (Explainable NLP Product Matching), and Phase 5 (MongoDB Historical Price Persistence Layer).
+This document details the REST API specification for **Smart Shopping** across Phase 2 (Backend Foundation), Phase 3 (Data Collection Layer), Phase 4 (Explainable NLP Product Matching), Phase 5 (MongoDB Historical Price Persistence), and Phase 6 (Price Trend Analysis Engine).
 
 - **Base URL**: `http://127.0.0.1:5000`
 - **API Prefix**: `/api/v1`
@@ -50,7 +50,147 @@ Checks whether the Express server is active and healthy.
 
 ---
 
-### 2.2 Historical Price Persistence & Retrieval API (Phase 5)
+### 2.2 Price Trend Analysis API (Phase 6)
+
+Phase 6 implements a pure statistical price trend analysis engine built directly on the historical price observations stored in MongoDB (Phase 5).
+
+> **Methodology & Mathematical Formulations**:
+> - **Statistical Determinism**: Phase 6 uses transparent statistical and arithmetic formulations. It does **not** use machine learning models or black-box predictions.
+> - **Price Change Formula**:
+>   $$\Delta P = P_{\text{latest}} - P_{\text{first}}$$
+>   $$\Delta P\% = \frac{P_{\text{latest}} - P_{\text{first}}}{P_{\text{first}}} \times 100$$
+> - **Directional Trend Classification** (configurable baseline threshold $\pm 1.0\%$):
+>   - $\Delta P\% < -1.0\% \implies$ `DECREASING`
+>   - $\Delta P\% > +1.0\% \implies$ `INCREASING`
+>   - $|\Delta P\%| \le 1.0\% \implies$ `STABLE`
+>   - $0$ observations $\implies$ `NO_DATA`
+>   - $1$ observation $\implies$ `INSUFFICIENT_DATA` (single observation cannot establish a directional trajectory)
+> - **Price Volatility Metrics**:
+>   - Population Standard Deviation: $\sigma = \sqrt{\frac{1}{N} \sum_{i=1}^N (P_i - \mu)^2}$
+>   - Coefficient of Variation: $CV = \frac{\sigma}{\mu} \times 100$
+> - **Out-of-Stock Policy**: Historical observations where `inStock: false` remain included in historical price movement calculations to maintain pricing continuity, while `latestInStock` accurately reports the current availability status of the latest observation.
+> - **Malformed Record Handling**: Invalid price observations (e.g. negative numbers, `NaN`, non-parseable timestamps) are safely excluded from calculations and counted under `invalidObservationCount`.
+
+#### `GET /api/v1/trends/products/:productId`
+Calculates overall historical price trend, volatility, and summary metrics for a canonical product from MongoDB.
+
+- **Query Parameters**:
+  - `from` (*string, optional*): Start date filter (ISO format e.g. `2026-09-01`).
+  - `to` (*string, optional*): End date filter (ISO format e.g. `2026-09-18`).
+
+- **Example Request**:
+```http
+GET /api/v1/trends/products/apple-iphone-16-128gb-black?from=2026-09-01&to=2026-09-18
+```
+
+- **Response (200 OK)**:
+```json
+{
+  "success": true,
+  "data": {
+    "productId": "apple-iphone-16-128gb-black",
+    "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+    "brand": "apple",
+    "model": "iphone 16",
+    "filter": {
+      "from": "2026-09-01",
+      "to": "2026-09-18"
+    },
+    "currentPrice": 70999,
+    "firstPrice": 70999,
+    "lowestPrice": 68999,
+    "highestPrice": 74039,
+    "averagePrice": 72032.67,
+    "priceChange": 0,
+    "percentageChange": 0,
+    "trend": "STABLE",
+    "volatility": {
+      "standardDeviation": 1718.23,
+      "coefficientOfVariation": 2.3854
+    },
+    "observationCount": 18,
+    "invalidObservationCount": 0,
+    "firstObservedAt": "2026-09-17T19:45:17.633Z",
+    "lastObservedAt": "2026-09-17T20:06:28.192Z",
+    "latestInStock": true
+  }
+}
+```
+
+#### `GET /api/v1/trends/products/:productId/platforms`
+Calculates isolated trend and volatility statistics separately for each retailer platform (Amazon, Flipkart, Croma, Blinkit, Zepto, Instamart).
+
+- **Query Parameters**:
+  - `from` (*string, optional*): Start date filter.
+  - `to` (*string, optional*): End date filter.
+
+- **Example Request**:
+```http
+GET /api/v1/trends/products/apple-iphone-16-128gb-black/platforms
+```
+
+- **Response (200 OK)**:
+```json
+{
+  "success": true,
+  "productId": "apple-iphone-16-128gb-black",
+  "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+  "filter": {
+    "from": null,
+    "to": null
+  },
+  "platformsCount": 6,
+  "data": {
+    "Amazon": {
+      "currentPrice": 70999,
+      "firstPrice": 70999,
+      "lowestPrice": 70999,
+      "highestPrice": 70999,
+      "averagePrice": 70999,
+      "priceChange": 0,
+      "percentageChange": 0,
+      "trend": "STABLE",
+      "volatility": {
+        "standardDeviation": 0,
+        "coefficientOfVariation": 0
+      },
+      "observationCount": 3,
+      "invalidObservationCount": 0,
+      "firstObservedAt": "2026-09-17T19:45:17.633Z",
+      "lastObservedAt": "2026-09-17T20:06:28.192Z",
+      "latestInStock": true
+    },
+    "Flipkart": {
+      "currentPrice": 68999,
+      "firstPrice": 68999,
+      "lowestPrice": 68999,
+      "highestPrice": 68999,
+      "averagePrice": 68999,
+      "priceChange": 0,
+      "percentageChange": 0,
+      "trend": "STABLE",
+      "volatility": {
+        "standardDeviation": 0,
+        "coefficientOfVariation": 0
+      },
+      "observationCount": 3,
+      "invalidObservationCount": 0,
+      "firstObservedAt": "2026-09-17T19:45:17.633Z",
+      "lastObservedAt": "2026-09-17T20:06:28.192Z",
+      "latestInStock": true
+    }
+  }
+}
+```
+
+- **Possible Errors**:
+  - `400 Bad Request` (`INVALID_PRODUCT_ID`): Product ID is missing or empty.
+  - `400 Bad Request` (`INVALID_DATE_RANGE`): Start date (`from`) is after end date (`to`) or date format is invalid.
+  - `404 Not Found` (`PRODUCT_NOT_FOUND`): Canonical product does not exist in catalog.
+
+---
+
+### 2.3 Historical Price Persistence & Retrieval API (Phase 5)
 
 Phase 5 establishes a real MongoDB persistence layer for immutable historical price observations across 3 normalized collections (`products`, `listings`, and `price_history`).
 

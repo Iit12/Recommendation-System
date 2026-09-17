@@ -107,6 +107,40 @@ export const api = {
   },
 
   /**
+   * Phase 6: GET /api/v1/trends/products/:productId?from=YYYY-MM-DD&to=YYYY-MM-DD
+   */
+  async getProductTrend(productId, filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.from) params.append('from', filters.from);
+    if (filters.to) params.append('to', filters.to);
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return request(`/trends/products/${encodeURIComponent(productId)}${queryString}`);
+  },
+
+  /**
+   * Phase 6: GET /api/v1/trends/products/:productId/platforms?from=YYYY-MM-DD&to=YYYY-MM-DD
+   */
+  async getPlatformTrends(productId, filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.from) params.append('from', filters.from);
+    if (filters.to) params.append('to', filters.to);
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return request(`/trends/products/${encodeURIComponent(productId)}/platforms${queryString}`);
+  },
+
+  /**
+   * Phase 5: GET /api/v1/history/products/:productId?from=YYYY-MM-DD&to=YYYY-MM-DD
+   */
+  async getProductHistory(productId, filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.from) params.append('from', filters.from);
+    if (filters.to) params.append('to', filters.to);
+    if (filters.limit) params.append('limit', filters.limit);
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return request(`/history/products/${encodeURIComponent(productId)}${queryString}`);
+  },
+
+  /**
    * GET /api/v1/products/meta/categories
    */
   async getCategories() {
