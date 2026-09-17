@@ -129,6 +129,17 @@ export const api = {
   },
 
   /**
+   * Phase 7.1: GET /api/v1/recommendations/products/:productId?from=YYYY-MM-DD&to=YYYY-MM-DD
+   */
+  async getProductRecommendation(productId, filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.from) params.append('from', filters.from);
+    if (filters.to) params.append('to', filters.to);
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return request(`/recommendations/products/${encodeURIComponent(productId)}${queryString}`);
+  },
+
+  /**
    * Phase 5: GET /api/v1/history/products/:productId?from=YYYY-MM-DD&to=YYYY-MM-DD
    */
   async getProductHistory(productId, filters = {}) {
