@@ -122,7 +122,41 @@ async function run() {
   // 9. Phase 3 Collection API
   await testReq('Phase 3 Collection Search', `${BASE_URL}/api/v1/collect/search?q=iphone+16`, { method: 'GET' }, 200);
 
-  // 10. Phase 2 Backend APIs Backward Compatibility
+  // 10. Phase 7.1 Recommendation Engine APIs
+  const recRes = await testReq(
+    'Phase 7.1 Product Recommendation (GET /api/v1/recommendations/products/:id)',
+    `${BASE_URL}/api/v1/recommendations/products/apple-iphone-16-128gb-black`,
+    { method: 'GET' },
+    200
+  );
+  if (recRes.ok) {
+    const r = recRes.data.data;
+    console.log(`     -> Action: ${r?.recommendation?.action} | Score: ${r?.recommendation?.score} (${r?.recommendation?.type}) | Best Platform: ${r?.platform?.bestPlatform} (₹${r?.platform?.bestPrice})`);
+    console.log(`     -> Reasons (${r?.reasons?.length}): "${r?.reasons?.[0]}"`);
+  }
+
+  await testReq(
+    'Phase 7.1 Date-Filtered Recommendation',
+    `${BASE_URL}/api/v1/recommendations/products/apple-iphone-16-128gb-black?from=2026-01-01&to=2026-12-31`,
+    { method: 'GET' },
+    200
+  );
+
+  await testReq(
+    'Phase 7.1 Invalid Date Range Error (400)',
+    `${BASE_URL}/api/v1/recommendations/products/apple-iphone-16-128gb-black?from=2026-09-20&to=2026-09-10`,
+    { method: 'GET' },
+    400
+  );
+
+  await testReq(
+    'Phase 7.1 Non-Existent Product Error (404)',
+    `${BASE_URL}/api/v1/recommendations/products/fake-non-existent-product-id`,
+    { method: 'GET' },
+    404
+  );
+
+  // 11. Phase 2 Backend APIs Backward Compatibility
   await testReq('Phase 2 Catalog Search', `${BASE_URL}/api/v1/search?q=iphone`, { method: 'GET' }, 200);
   await testReq('Phase 2 All Products', `${BASE_URL}/api/v1/products`, { method: 'GET' }, 200);
   await testReq('Phase 2 Single Product', `${BASE_URL}/api/v1/products/iphone-16`, { method: 'GET' }, 200);

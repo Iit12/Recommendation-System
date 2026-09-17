@@ -552,7 +552,107 @@ GET /api/v1/collect/search?q=iphone+16&platforms=amazon,flipkart,croma
 
 ---
 
-### 2.3 Search API
+### 2.3 Heuristic Recommendation Engine API (Phase 7.1)
+
+Phase 7.1 implements an explainable, deterministic recommendation engine built on real MongoDB historical price data and Phase 6 trend statistics.
+
+> **Methodology & Heuristic Architecture**:
+> - **Deterministic Heuristic**: This engine is a deterministic rule-based heuristic system, **not a trained machine-learning model or black-box probability generator**.
+> - **Scoring Scale (0–100)**:
+>   - Score $\ge 65 \implies$ `BUY_NOW`
+>   - Score $\le 40 \implies$ `WAIT`
+>   - $41 \le \text{Score} < 65 \implies$ `NEUTRAL` (balanced or conflicting evidence)
+> - **Component Weights (Sum = 100)**:
+>   1. `PRICE_VS_AVERAGE` ($35\%$): Evaluates discount/premium relative to historical arithmetic mean.
+>   2. `PRICE_VS_LOW` ($25\%$): Evaluates proximity to the all-time recorded floor.
+>   3. `TREND_MOMENTUM` ($20\%$): Evaluates directional trajectory (falling prices suggest waiting; rising prices from a low base suggest buying).
+>   4. `PLATFORM_ADVANTAGE` ($10\%$): Evaluates cross-retailer deal spread.
+>   5. `VOLATILITY_FACTOR` ($10\%$): Evaluates price consistency and damps high volatility toward neutral.
+> - **Explainable Conflict Exposing**: Transparently explains conflicting signals (e.g. current price is below average, but downward momentum suggests waiting for further drops).
+> - **Out-of-Stock Constraints**: Out-of-stock items are capped ($\le 35$) and can never receive `BUY_NOW`.
+
+#### `GET /api/v1/recommendations/products/:productId`
+Computes explainable purchase recommendation, heuristic score, component breakdowns, and supporting evidence.
+
+- **Query Parameters**:
+  - `from` (*string, optional*): Start date filter (ISO format e.g. `2026-09-01`).
+  - `to` (*string, optional*): End date filter (ISO format e.g. `2026-09-18`).
+
+- **Example Request**:
+  ```http
+  GET /api/v1/recommendations/products/apple-iphone-16-128gb-black
+  ```
+
+- **Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "product": {
+        "productId": "apple-iphone-16-128gb-black",
+        "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+        "brand": "apple",
+        "model": "iphone 16"
+      },
+      "recommendation": {
+        "action": "NEUTRAL",
+        "score": 63,
+        "type": "HEURISTIC",
+        "componentScores": {
+          "priceVsAverage": 22.5,
+          "priceVsLow": 17.75,
+          "trendMomentum": 5.0,
+          "platformAdvantage": 10.0,
+          "volatility": 8.0
+        }
+      },
+      "reasons": [
+        "Current price of ₹70,999 is 1.4% below the historical average of ₹72,032.",
+        "Current price is within 2.9% of the historical low (₹68,999).",
+        "Recent price momentum is downward (-4.1%), suggesting prices may drop further if you wait.",
+        "Flipkart currently offers the best price at ₹68,999 with a ₹5,040 (7.3%) cross-retailer advantage.",
+        "Product is confirmed in stock across tracked retailers."
+      ],
+      "evidence": {
+        "currentPrice": 70999,
+        "historicalAverage": 72032,
+        "historicalLow": 68999,
+        "historicalHigh": 74039,
+        "priceChange": -3040,
+        "priceChangePercent": -4.1059,
+        "trend": "DECREASING",
+        "standardDeviation": 1718.27,
+        "coefficientOfVariation": 2.3854,
+        "observations": 36,
+        "latestInStock": true
+      },
+      "platform": {
+        "bestPlatform": "Flipkart",
+        "bestPrice": 68999,
+        "priceSpread": 5040,
+        "platformSpreadPercent": 7.3
+      },
+      "filter": {
+        "from": null,
+        "to": null
+      },
+      "limitations": [
+        "Recommendation is derived from a deterministic heuristic algorithm, not a trained machine-learning model.",
+        "Historical observations reflect prices collected across tracked multi-platform listings in MongoDB.",
+        "Marketplace prices, stock levels, and promotional discounts may fluctuate without prior notice."
+      ]
+    }
+  }
+  ```
+
+- **Possible Errors**:
+  - `400 Bad Request` (`INVALID_PRODUCT_ID`): Product ID is empty or invalid.
+  - `400 Bad Request` (`INVALID_DATE_RANGE`): `from` date is after `to` date or date format is malformed.
+  - `404 Not Found` (`PRODUCT_NOT_FOUND`): Canonical product ID not found in database.
+
+---
+
+### 2.4 Search API
 
 #### `GET /api/v1/search`
 Searches product catalog across model names, brands, variants, and categories.
@@ -563,7 +663,7 @@ Searches product catalog across model names, brands, variants, and categories.
 
 ---
 
-### 2.4 Product Catalog API
+### 2.5 Product Catalog API
 
 #### `GET /api/v1/products`
 Retrieves all products currently tracked in the catalog.
@@ -573,7 +673,7 @@ Retrieves detailed specifications and metadata for a single product.
 
 ---
 
-### 2.5 Multi-Store Price Comparison API
+### 2.6 Multi-Store Price Comparison API
 
 #### `GET /api/v1/products/:id/prices`
 Fetches normalized price quotes across Amazon, Flipkart, Croma, Blinkit, Zepto, and Instamart.
@@ -582,14 +682,14 @@ Fetches normalized price quotes across Amazon, Flipkart, Croma, Blinkit, Zepto, 
 
 ---
 
-### 2.6 Historical Price Trend API
+### 2.7 Historical Price Trend API
 
 #### `GET /api/v1/products/:id/trends`
 Retrieves price history points and moving averages for `7D`, `30D`, `3M`, or `6M`.
 
 ---
 
-### 2.7 AI Buy Now / Wait Recommendation API
+### 2.8 Legacy Product Recommendation API (Phase 2)
 
 #### `GET /api/v1/products/:id/recommendation`
 Returns purchase timing recommendation with confidence scores and market signals.
@@ -604,6 +704,7 @@ Returns purchase timing recommendation with confidence scores and market signals
 | `INVALID_QUERY` | `400` | Search query is less than 2 characters |
 | `UNSUPPORTED_PLATFORM` | `400` | One or more requested platforms in `platforms` filter is invalid |
 | `INVALID_PRODUCT_ID` | `400` | Provided product ID is invalid or empty |
+| `INVALID_DATE_RANGE` | `400` | Start date is later than end date or malformed date string |
 | `PRODUCT_NOT_FOUND` | `404` | Product does not exist in catalog |
 | `PRICES_NOT_FOUND` | `404` | No price quotes found for product |
 | `TRENDS_NOT_FOUND` | `404` | No trend history found for product |
