@@ -5,6 +5,7 @@ import priceRoutes from './price.routes.js';
 import trendRoutes from './trend.routes.js';
 import recommendationRoutes from './recommendation.routes.js';
 import collectRoutes from './collect.routes.js';
+import matchingRoutes from './matching.routes.js';
 
 const router = Router();
 
@@ -15,5 +16,7 @@ router.use('/prices', priceRoutes);
 router.use('/trends', trendRoutes);
 router.use('/recommendations', recommendationRoutes);
 router.use('/collect', collectRoutes);
+router.use('/matching', matchingRoutes);
 
 export default router;
+
