@@ -6,6 +6,7 @@ import trendRoutes from './trend.routes.js';
 import recommendationRoutes from './recommendation.routes.js';
 import collectRoutes from './collect.routes.js';
 import matchingRoutes from './matching.routes.js';
+import historyRoutes from './history.routes.js';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.use('/trends', trendRoutes);
 router.use('/recommendations', recommendationRoutes);
 router.use('/collect', collectRoutes);
 router.use('/matching', matchingRoutes);
+router.use('/history', historyRoutes);
 
 export default router;
 

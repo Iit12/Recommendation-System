@@ -1,6 +1,6 @@
 # Smart Shopping — REST API Documentation (v1)
 
-This document details the REST API specification for **Smart Shopping** across Phase 2 (Backend Foundation), Phase 3 (Data Collection Layer), and Phase 4 (Explainable NLP Product Matching).
+This document details the REST API specification for **Smart Shopping** across Phase 2 (Backend Foundation), Phase 3 (Data Collection Layer), Phase 4 (Explainable NLP Product Matching), and Phase 5 (MongoDB Historical Price Persistence Layer).
 
 - **Base URL**: `http://127.0.0.1:5000`
 - **API Prefix**: `/api/v1`
@@ -50,7 +50,152 @@ Checks whether the Express server is active and healthy.
 
 ---
 
-### 2.2 Explainable NLP Product Matching API (Phase 4)
+### 2.2 Historical Price Persistence & Retrieval API (Phase 5)
+
+Phase 5 establishes a real MongoDB persistence layer for immutable historical price observations across 3 normalized collections (`products`, `listings`, and `price_history`).
+
+> **Database Architecture**:
+> - **Database**: `smart_shopping` (MongoDB 8.x native driver, no Mongoose).
+> - **Append-Only Principle**: Price observations are strictly append-only; historical prices are never overwritten.
+> - **Collections**:
+>   - `products`: Canonical products produced by Phase 4 matching with unique index on `canonicalId`.
+>   - `listings`: Retailer-specific listings with compound unique index on `{ platform: 1, productUrl: 1 }` and foreign reference `productId`.
+>   - `price_history`: Append-only time-series observations indexed on `{ productId: 1, collectedAt: -1 }`, `{ platform: 1, productId: 1, collectedAt: -1 }`, and `{ listingId: 1, collectedAt: -1 }`.
+
+#### `POST /api/v1/history/collect`
+Runs the Phase 3 Collection $\to$ Phase 4 Matching $\to$ Phase 5 MongoDB Persistence pipeline.
+
+- **Request Body**:
+```json
+{
+  "query": "iphone 16",
+  "platforms": ["amazon", "flipkart", "croma", "blinkit", "zepto", "instamart"]
+}
+```
+
+- **Response (200 OK)**:
+```json
+{
+  "success": true,
+  "query": "iphone 16",
+  "collectedAt": "2026-09-17T19:45:17.633Z",
+  "platformsRequested": ["amazon", "flipkart", "croma", "blinkit", "zepto", "instamart"],
+  "platformsSuccessful": ["amazon", "flipkart", "croma", "blinkit", "zepto", "instamart"],
+  "totalListings": 6,
+  "totalCanonicalProducts": 1,
+  "productsUpserted": 1,
+  "listingsUpserted": 6,
+  "observationsSaved": 6,
+  "data": [
+    {
+      "canonicalId": "apple-iphone-16-128gb-black",
+      "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+      "listingsCount": 6,
+      "observationsSaved": 6
+    }
+  ]
+}
+```
+
+#### `GET /api/v1/history/products/:productId`
+Retrieves chronological price observation timeline for a canonical product with optional date-range filtering.
+
+- **Query Parameters**:
+  - `from` (*string, optional*): Start date filter (ISO format e.g. `2026-09-01`).
+  - `to` (*string, optional*): End date filter (ISO format e.g. `2026-09-18`).
+  - `limit` (*number, optional*): Maximum observation records to return (default 200).
+
+- **Example Request**:
+```http
+GET /api/v1/history/products/apple-iphone-16-128gb-black?from=2026-09-01&to=2026-09-18
+```
+
+- **Response (200 OK)**:
+```json
+{
+  "success": true,
+  "productId": "apple-iphone-16-128gb-black",
+  "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+  "brand": "apple",
+  "model": "iphone 16",
+  "totalObservations": 6,
+  "filter": {
+    "from": "2026-09-01",
+    "to": "2026-09-18"
+  },
+  "data": [
+    {
+      "_id": "6aac434d64c9e1692b6908cc",
+      "productId": "apple-iphone-16-128gb-black",
+      "listingId": "amazon-7e7ba7e99312",
+      "platform": "Amazon",
+      "price": 70999,
+      "originalPrice": 79900,
+      "discount": 11,
+      "deliveryCharge": 0,
+      "effectivePrice": 70999,
+      "currency": "INR",
+      "inStock": true,
+      "deliveryText": "Free One-Day Prime Delivery",
+      "collectedAt": "2026-09-17T19:45:17.633Z"
+    }
+  ]
+}
+```
+
+#### `GET /api/v1/history/products/:productId/latest`
+Returns the latest recorded price observation per platform for a canonical product.
+
+- **Response (200 OK)**:
+```json
+{
+  "success": true,
+  "productId": "apple-iphone-16-128gb-black",
+  "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+  "platformsCount": 6,
+  "data": [
+    {
+      "platform": "Flipkart",
+      "price": 68999,
+      "effectivePrice": 68999,
+      "collectedAt": "2026-09-17T19:45:17.633Z"
+    },
+    {
+      "platform": "Amazon",
+      "price": 70999,
+      "effectivePrice": 70999,
+      "collectedAt": "2026-09-17T19:45:17.633Z"
+    }
+  ]
+}
+```
+
+#### `GET /api/v1/history/products/:productId/summary`
+Returns basic historical price summary statistics needed for future trend analysis (Phase 6).
+
+- **Response (200 OK)**:
+```json
+{
+  "success": true,
+  "productId": "apple-iphone-16-128gb-black",
+  "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+  "data": {
+    "productId": "apple-iphone-16-128gb-black",
+    "currentPrice": 68999,
+    "lowestPrice": 68999,
+    "highestPrice": 74039,
+    "averagePrice": 72032,
+    "observationCount": 6,
+    "platformsTracked": ["Amazon", "Flipkart", "Croma", "Blinkit", "Zepto", "Instamart"],
+    "firstObservedAt": "2026-09-17T19:45:17.633Z",
+    "lastObservedAt": "2026-09-17T19:45:17.633Z"
+  }
+}
+```
+
+---
+
+### 2.3 Explainable NLP Product Matching API (Phase 4)
 
 #### `GET /api/v1/matching/search`
 Executes an explainable, deterministic NLP matching and grouping pipeline. It retrieves multi-platform normalized listings from Phase 3, normalizes listing titles, extracts structured specification attributes, computes token similarity alongside attribute agreement, and clusters identical product variants into canonical groups.
