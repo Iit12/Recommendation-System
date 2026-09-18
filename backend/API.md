@@ -652,6 +652,172 @@ Computes explainable purchase recommendation, heuristic score, component breakdo
 
 ---
 
+### 2.4 Deal Score & Best Deal Ranking API (Phase 8.1)
+
+Phase 8.1 implements a multi-attribute deal evaluation and ranking engine that evaluates every current retailer listing for a product on a normalized $[0, 100]$ score, ranks them deterministically, and identifies the `bestDeal`.
+
+> **Methodology & Heuristic Architecture**:
+> - **Deterministic Heuristic**: This engine uses transparent arithmetic calculations and rule-based weights. It is **not a machine-learning or predictive model**.
+> - **Distinct from Phase 7**: Phase 7 evaluates purchase timing (`BUY_NOW`/`WAIT`/`NEUTRAL`), whereas Phase 8.1 evaluates listing quality across competing stores.
+> - **Component Weights (Sum = 100)**:
+>   1. `PRICE_POSITION` ($40\%$): Compares listing effective price against historical average and recorded low.
+>   2. `PLATFORM_ADVANTAGE` ($30\%$): Evaluates price competitiveness against competing active retailer listings. Neutral baseline $15 / 30$ when only 1 listing exists.
+>   3. `DISCOUNT_PERCENTAGE` ($15\%$): Evaluates listed promotional discount percentage against original MSRP.
+>   4. `DELIVERY_FEE` ($10\%$): Full 10 points for free delivery; scaled penalty for shipping charges.
+>   5. `SELLER_RATING` ($5\%$): Evaluates seller reputation score on a 5-star scale.
+> - **Out-of-Stock Constraints**: Out-of-stock listings are capped at score $\le 25$ and strictly ineligible for `bestDeal` candidacy.
+> - **Tie-Breaking Determinism**:
+>   1. `dealScore` descending
+>   2. `effectivePrice` ascending (lower price wins)
+>   3. `sellerRating` descending
+>   4. `platform` alphabetical
+> - **Best Deal Selection**: The highest-ranked in-stock listing is selected as `bestDeal`. If all listings are out of stock, `bestDeal` is `null`.
+
+#### `GET /api/v1/deals/products/:productId`
+Calculates deal scores for all active retailer listings of a product, ranks them, identifies the `bestDeal`, and generates explainable deal reasons.
+
+- **Query Parameters**:
+  - `from` (*string, optional*): Start date filter for historical reference baseline (ISO format e.g. `2026-09-01`).
+  - `to` (*string, optional*): End date filter for historical reference baseline (ISO format e.g. `2026-09-18`).
+
+- **Example Request**:
+  ```http
+  GET /api/v1/deals/products/apple-iphone-16-128gb-black
+  ```
+
+- **Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "product": {
+        "productId": "apple-iphone-16-128gb-black",
+        "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+        "brand": "apple",
+        "model": "iphone 16"
+      },
+      "bestDeal": {
+        "rank": 1,
+        "listingId": "flipkart-928ab01c",
+        "platform": "Flipkart",
+        "price": 68999,
+        "deliveryCharge": 0,
+        "effectivePrice": 68999,
+        "dealScore": 88,
+        "inStock": true,
+        "sellerName": "SuperComNet Flipkart Assured",
+        "sellerRating": 4.8,
+        "reasons": [
+          "Current price of ₹68,999 is 4.2% below the historical average of ₹72,032.",
+          "Cheapest store price at ₹68,999 with a ₹5,040 (7.3%) advantage over the highest store.",
+          "14% discount from original MSRP (₹79,900).",
+          "Includes free delivery.",
+          "High seller rating of 4.8★ (SuperComNet Flipkart Assured)."
+        ]
+      },
+      "rankedListings": [
+        {
+          "rank": 1,
+          "listingId": "flipkart-928ab01c",
+          "platform": "Flipkart",
+          "listingTitle": "Apple iPhone 16 (Black, 128 GB)",
+          "productUrl": "https://www.flipkart.com/apple-iphone-16-black-128-gb/p/itm16blk128",
+          "price": 68999,
+          "originalPrice": 79900,
+          "discount": 14,
+          "deliveryCharge": 0,
+          "effectivePrice": 68999,
+          "sellerName": "SuperComNet Flipkart Assured",
+          "sellerRating": 4.8,
+          "inStock": true,
+          "deliveryText": "Free Express Delivery (2 Days)",
+          "dealScore": 88,
+          "componentScores": {
+            "pricePosition": 38.5,
+            "platformAdvantage": 30.0,
+            "discount": 10.5,
+            "delivery": 10.0,
+            "sellerRating": 4.8
+          },
+          "overriddenBy": null,
+          "reasons": [
+            "Current price of ₹68,999 is 4.2% below the historical average of ₹72,032.",
+            "Cheapest store price at ₹68,999 with a ₹5,040 (7.3%) advantage over the highest store.",
+            "14% discount from original MSRP (₹79,900).",
+            "Includes free delivery.",
+            "High seller rating of 4.8★ (SuperComNet Flipkart Assured)."
+          ]
+        },
+        {
+          "rank": 2,
+          "listingId": "amazon-7e7ba7e9",
+          "platform": "Amazon",
+          "listingTitle": "Apple iPhone 16 (128 GB) - Black",
+          "productUrl": "https://www.amazon.in/dp/B0DGJ6SDF8",
+          "price": 70999,
+          "originalPrice": 79900,
+          "discount": 11,
+          "deliveryCharge": 0,
+          "effectivePrice": 70999,
+          "sellerName": "Appario Retail Pvt Ltd",
+          "sellerRating": 4.9,
+          "inStock": true,
+          "deliveryText": "Free One-Day Prime Delivery",
+          "dealScore": 79,
+          "componentScores": {
+            "pricePosition": 35.0,
+            "platformAdvantage": 21.3,
+            "discount": 8.25,
+            "delivery": 10.0,
+            "sellerRating": 4.9
+          },
+          "overriddenBy": null,
+          "reasons": [
+            "Current price of ₹70,999 is 1.4% below the historical average of ₹72,032.",
+            "Competitive price at ₹70,999 with ₹3,040 savings compared to the highest store.",
+            "11% discount from original MSRP (₹79,900).",
+            "Includes free delivery.",
+            "High seller rating of 4.9★ (Appario Retail Pvt Ltd)."
+          ]
+        }
+      ],
+      "market": {
+        "lowestPrice": 68999,
+        "highestPrice": 74039,
+        "priceSpread": 5040,
+        "platformCount": 6,
+        "inStockCount": 6
+      },
+      "scoring": {
+        "type": "HEURISTIC",
+        "weights": {
+          "pricePosition": 40,
+          "platformAdvantage": 30,
+          "discount": 15,
+          "delivery": 10,
+          "sellerRating": 5
+        }
+      },
+      "filter": {
+        "from": null,
+        "to": null
+      },
+      "limitations": [
+        "Deal scores are computed via a deterministic multi-factor heuristic algorithm, not machine learning.",
+        "Rankings are calculated based on currently tracked listings in MongoDB.",
+        "Store pricing, delivery fees, and stock availability may change dynamically on retailer platforms."
+      ]
+    }
+  }
+  ```
+
+- **Possible Errors**:
+  - `400 Bad Request` (`INVALID_PRODUCT_ID`): Product ID is empty or invalid.
+  - `400 Bad Request` (`INVALID_DATE_RANGE`): `from` date is after `to` date or date format is malformed.
+  - `404 Not Found` (`PRODUCT_NOT_FOUND`): Canonical product ID not found in database.
+
+---
+
 ### 2.4 Search API
 
 #### `GET /api/v1/search`

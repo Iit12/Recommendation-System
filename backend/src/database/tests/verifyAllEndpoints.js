@@ -156,7 +156,41 @@ async function run() {
     404
   );
 
-  // 11. Phase 2 Backend APIs Backward Compatibility
+  // 11. Phase 8.1 Deal Score & Best Deal Ranking APIs
+  const dealRes = await testReq(
+    'Phase 8.1 Product Deals & Ranking (GET /api/v1/deals/products/:id)',
+    `${BASE_URL}/api/v1/deals/products/apple-iphone-16-128gb-black`,
+    { method: 'GET' },
+    200
+  );
+  if (dealRes.ok) {
+    const d = dealRes.data.data;
+    console.log(`     -> Total Deals: ${d?.rankedListings?.length} | Best Platform: ${d?.bestDeal?.platform} (Score: ${d?.bestDeal?.dealScore}, ₹${d?.bestDeal?.effectivePrice}) | Market Min: ₹${d?.market?.lowestPrice}`);
+    console.log(`     -> Best Deal Key Reason: "${d?.bestDeal?.reasons?.[0]}"`);
+  }
+
+  await testReq(
+    'Phase 8.1 Date-Filtered Deals',
+    `${BASE_URL}/api/v1/deals/products/apple-iphone-16-128gb-black?from=2026-01-01&to=2026-12-31`,
+    { method: 'GET' },
+    200
+  );
+
+  await testReq(
+    'Phase 8.1 Invalid Date Range Error (400)',
+    `${BASE_URL}/api/v1/deals/products/apple-iphone-16-128gb-black?from=2026-09-20&to=2026-09-10`,
+    { method: 'GET' },
+    400
+  );
+
+  await testReq(
+    'Phase 8.1 Non-Existent Product Error (404)',
+    `${BASE_URL}/api/v1/deals/products/fake-non-existent-product-id`,
+    { method: 'GET' },
+    404
+  );
+
+  // 12. Phase 2 Backend APIs Backward Compatibility
   await testReq('Phase 2 Catalog Search', `${BASE_URL}/api/v1/search?q=iphone`, { method: 'GET' }, 200);
   await testReq('Phase 2 All Products', `${BASE_URL}/api/v1/products`, { method: 'GET' }, 200);
   await testReq('Phase 2 Single Product', `${BASE_URL}/api/v1/products/iphone-16`, { method: 'GET' }, 200);
