@@ -10,6 +10,7 @@ import historyRoutes from './history.routes.js';
 import dealRoutes from './deal.routes.js';
 import alternativeRoutes from './alternative.routes.js';
 import personalizedRoutes from './personalized.routes.js';
+import alertRoutes from './alert.routes.js';
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.use('/history', historyRoutes);
 router.use('/deals', dealRoutes);
 router.use('/alternatives', alternativeRoutes);
 router.use('/personalized', personalizedRoutes);
+router.use('/alerts', alertRoutes);
 
 export default router;
 

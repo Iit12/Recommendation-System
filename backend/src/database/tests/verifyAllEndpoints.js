@@ -297,7 +297,75 @@ async function run() {
     404
   );
 
-  // 14. Phase 2 Backend APIs Backward Compatibility
+  // 14. Phase 8.4 Price Alert & Watchlist Intelligence APIs
+  const alertRes = await testReq(
+    'Phase 8.4 Price Alert Evaluation (POST /api/v1/alerts/evaluate)',
+    `${BASE_URL}/api/v1/alerts/evaluate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId: 'apple-iphone-16-128gb-black',
+        alerts: {
+          targetPrice: 75000,
+          priceDropPercent: 2.0,
+          nearHistoricalLowPercent: 5.0,
+          restock: true,
+        },
+      }),
+    },
+    200
+  );
+  if (alertRes.ok) {
+    const al = alertRes.data.data;
+    console.log(`     -> Product: ${al?.product?.title} | Alerts Evaluated: ${al?.alerts?.length}`);
+    console.log(`     -> Overall Status: ${al?.summary?.status} (Triggered: ${al?.summary?.triggered})`);
+    console.log(`     -> Alert 1 Message: "${al?.alerts?.[0]?.message}"`);
+  }
+
+  await testReq(
+    'Phase 8.4 Price Alert with Single Rule (Sony Headphones)',
+    `${BASE_URL}/api/v1/alerts/evaluate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId: 'sony-wh-1000xm5-silver',
+        alerts: { targetPrice: 30000 },
+      }),
+    },
+    200
+  );
+
+  await testReq(
+    'Phase 8.4 Invalid Alert Rules Error (400)',
+    `${BASE_URL}/api/v1/alerts/evaluate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId: 'apple-iphone-16-128gb-black',
+        alerts: {},
+      }),
+    },
+    400
+  );
+
+  await testReq(
+    'Phase 8.4 Non-Existent Product Error (404)',
+    `${BASE_URL}/api/v1/alerts/evaluate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId: 'fake-non-existent-product-id',
+        alerts: { targetPrice: 1000 },
+      }),
+    },
+    404
+  );
+
+  // 15. Phase 2 Backend APIs Backward Compatibility
   await testReq('Phase 2 Catalog Search', `${BASE_URL}/api/v1/search?q=iphone`, { method: 'GET' }, 200);
   await testReq('Phase 2 All Products', `${BASE_URL}/api/v1/products`, { method: 'GET' }, 200);
   await testReq('Phase 2 Single Product', `${BASE_URL}/api/v1/products/iphone-16`, { method: 'GET' }, 200);

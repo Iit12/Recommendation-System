@@ -1045,6 +1045,78 @@ Calculates preference-aware alternative product rankings for a target product ba
 
 ---
 
+### 2.3.9 Price Alert & Watchlist Intelligence API (Phase 8.4)
+
+Evaluates user-defined alert rules (`targetPrice`, `priceDropPercent`, `nearHistoricalLowPercent`, `restock`) against live in-stock marketplace listings and historical price data.
+
+#### `POST /api/v1/alerts/evaluate`
+
+- **Request Body**:
+```json
+{
+  "productId": "apple-iphone-16-128gb-black",
+  "alerts": {
+    "targetPrice": 75000,
+    "priceDropPercent": 2.0,
+    "nearHistoricalLowPercent": 5.0,
+    "restock": true
+  }
+}
+```
+
+- **Alert Rules**:
+  - `targetPrice` (*number, optional*): Triggers when `currentPrice <= targetPrice`.
+  - `priceDropPercent` (*number, optional*): Triggers when drop from previous recorded price $\ge$ threshold.
+  - `nearHistoricalLowPercent` (*number, optional*): Triggers when `currentPrice <= historicalLow * (1 + threshold / 100)`.
+  - `restock` (*boolean, optional*): Triggers when previous state was out-of-stock and product is now in stock.
+
+- **Response (200 OK)**:
+```json
+{
+  "success": true,
+  "data": {
+    "product": {
+      "canonicalId": "apple-iphone-16-128gb-black",
+      "title": "Apple Iphone 16 (128GB, Black)"
+    },
+    "currentListing": {
+      "platform": "flipkart",
+      "price": 68999,
+      "effectivePrice": 68999,
+      "inStock": true,
+      "productUrl": "https://www.flipkart.com/..."
+    },
+    "alerts": [
+      {
+        "type": "TARGET_PRICE",
+        "status": "TRIGGERED",
+        "threshold": 75000,
+        "currentValue": 68999,
+        "message": "Current price of ₹68,999 is at or below your target price of ₹75,000."
+      }
+    ],
+    "summary": {
+      "status": "TRIGGERED",
+      "triggered": true,
+      "triggeredCount": 1,
+      "evaluatedCount": 1,
+      "notEvaluableCount": 0
+    },
+    "metadata": {
+      "evaluatedAt": "2026-09-18T14:15:00.000Z",
+      "historicalObservationsUsed": 96
+    }
+  }
+}
+```
+
+- **Error Codes**:
+  - `400 Bad Request` (`INVALID_PRODUCT_ID`): `productId` missing or invalid.
+  - `400 Bad Request` (`INVALID_ALERT_RULES`): Empty alerts object or invalid rule thresholds.
+  - `404 Not Found` (`PRODUCT_NOT_FOUND`): Target product ID not found in catalog.
+
+---
+
 ### 2.4 Search API
 
 #### `GET /api/v1/search`
