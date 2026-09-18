@@ -916,6 +916,135 @@ Calculates content-based alternative product recommendations for a target produc
 
 ---
 
+### 2.6 Preference-Aware Recommendation API (Phase 8.3)
+
+Phase 8.3 implements an explainable, deterministic preference-aware recommendation layer that re-ranks candidate alternative products according to user-supplied constraints (budget, minimum storage/RAM, brand preferences, feature priorities, and marketplace deal quality).
+
+> **Methodology & Heuristic Architecture**:
+> - **Deterministic Preference-Aware Content-Ranking**: Evaluates explicit user preferences against structured catalog attributes. **This is not a trained machine-learning model, collaborative filtering, or neural recommendation network**.
+> - **Component Weights (Sum = 100)**:
+>   1. `BUDGET_COMPATIBILITY` ($30\%$): Evaluates candidate price against `maxBudget`. Full points when within budget; smooth linear penalty when exceeding budget. Neutral baseline $15 / 30$ when omitted.
+>   2. `SPECIFICATION_MATCH` ($30\%$): Storage ($18\text{ pts}$) + RAM ($12\text{ pts}$). Full points when meeting/exceeding `minStorage` and `minRam`. Proportional penalty for deficits. Neutral baselines ($9 / 18$ and $6 / 12$) when omitted.
+>   3. `FEATURE_PRIORITY_MATCH` ($20\%$): Evaluates alignment against user-provided priority weights (`price`, `storage`, `performance`, `brand`). Neutral baseline $10 / 20$ when omitted.
+>   4. `BRAND_PREFERENCE` ($10\%$): $10\text{ pts}$ for brands in `preferredBrands`; $5\text{ pts}$ (soft baseline) for other brands.
+>   5. `DEAL_QUALITY` ($10\%$): Incorporates Phase 8.1 Marketplace Deal Score ($0–100 \implies 0–10\text{ pts}$). Neutral baseline $5 / 10$ when unavailable.
+> - **Anti-Cheapest Bias**: Budget proximity and specification fulfillment prevent low-tier budget products from overpowering superior compatible alternatives.
+> - **Deterministic Tie-Breaking**:
+>   1. `personalizedScore` descending
+>   2. `currentPrice` ascending
+>   3. `canonicalId` alphabetical
+
+#### `POST /api/v1/personalized/recommendations`
+Calculates preference-aware alternative product rankings for a target product based on supplied user requirements.
+
+- **Request Body**:
+  ```json
+  {
+    "productId": "apple-iphone-16-128gb-black",
+    "preferences": {
+      "maxBudget": 80000,
+      "preferredBrands": ["samsung", "apple"],
+      "minStorage": 128,
+      "minRam": 8,
+      "priorities": {
+        "price": 0.40,
+        "storage": 0.30,
+        "performance": 0.20,
+        "brand": 0.10
+      }
+    }
+  }
+  ```
+
+- **Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "targetProduct": {
+        "canonicalId": "apple-iphone-16-128gb-black",
+        "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+        "brand": "apple",
+        "model": "iphone 16",
+        "category": "smartphones",
+        "currentPrice": 68999
+      },
+      "preferences": {
+        "maxBudget": 80000,
+        "preferredBrands": ["samsung", "apple"],
+        "minStorage": 128,
+        "minRam": 8,
+        "priorities": {
+          "price": 0.4,
+          "storage": 0.3,
+          "performance": 0.2,
+          "brand": 0.1
+        }
+      },
+      "recommendations": [
+        {
+          "rank": 1,
+          "canonicalId": "samsung-galaxy-s25-256gb-12gb-titanium-gray",
+          "title": "Samsung Galaxy S25 (12GB, 256GB, Titanium gray)",
+          "brand": "samsung",
+          "model": "galaxy s25",
+          "storage": "256gb",
+          "ram": "12gb",
+          "color": "titanium gray",
+          "variant": "5g",
+          "category": "smartphones",
+          "currentPrice": 74999,
+          "personalizedScore": 86,
+          "breakdown": {
+            "budgetCompatibility": 27.28,
+            "specificationMatch": 30.0,
+            "featurePriorityMatch": 16.5,
+            "brandPreference": 10.0,
+            "dealQuality": 8.8
+          },
+          "reasons": [
+            "Within your budget of ₹80,000 (Price: ₹74,999).",
+            "Offers 256GB storage, fulfilling your minimum requirement (128GB).",
+            "Provides 12GB RAM, fulfilling your minimum requirement (8GB).",
+            "Matches your preferred brand list (Samsung).",
+            "Strong marketplace deal quality score (88/100)."
+          ]
+        }
+      ],
+      "metadata": {
+        "algorithm": "preference-aware-content-ranking",
+        "scoringType": "PREFERENCE_AWARE_HEURISTIC",
+        "weights": {
+          "budgetCompatibility": 30,
+          "specificationMatch": 30,
+          "featurePriorityMatch": 20,
+          "brandPreference": 10,
+          "dealQuality": 10
+        },
+        "candidateCount": 5,
+        "recommendationCount": 1,
+        "deterministic": true
+      },
+      "limitations": [
+        "Personalized recommendation scores are calculated via a deterministic preference-aware content-ranking algorithm, not a trained machine-learning model or collaborative filtering.",
+        "Recommendations re-rank content-based alternative candidates based on explicitly supplied user constraints and preferences.",
+        "Marketplace prices, stock levels, and promotional discounts may fluctuate in real time on retailer websites."
+      ]
+    }
+  }
+  ```
+
+- **Possible Errors**:
+  - `400 Bad Request` (`INVALID_PRODUCT_ID`): Product ID is empty or missing.
+  - `400 Bad Request` (`INVALID_PREFERENCES`): Preferences is not an object.
+  - `400 Bad Request` (`INVALID_BUDGET`): `maxBudget` is $\le 0$ or non-numeric.
+  - `400 Bad Request` (`INVALID_MIN_STORAGE` / `INVALID_MIN_RAM`): Storage/RAM minimum is $< 0$.
+  - `400 Bad Request` (`INVALID_PREFERRED_BRANDS`): `preferredBrands` is not an array.
+  - `400 Bad Request` (`INVALID_PRIORITIES`): Priority weights are negative or non-numeric.
+  - `404 Not Found` (`PRODUCT_NOT_FOUND`): Target product ID not found in database.
+
+---
+
 ### 2.4 Search API
 
 #### `GET /api/v1/search`

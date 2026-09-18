@@ -226,7 +226,78 @@ async function run() {
     404
   );
 
-  // 13. Phase 2 Backend APIs Backward Compatibility
+  // 13. Phase 8.3 Preference-Aware Recommendation APIs
+  const persRes = await testReq(
+    'Phase 8.3 Preference-Aware Recommendations (POST /api/v1/personalized/recommendations)',
+    `${BASE_URL}/api/v1/personalized/recommendations`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId: 'apple-iphone-16-128gb-black',
+        preferences: {
+          maxBudget: 80000,
+          minStorage: 128,
+          minRam: 8,
+          preferredBrands: ['samsung', 'apple'],
+          priorities: { price: 0.4, storage: 0.3, performance: 0.2, brand: 0.1 },
+        },
+      }),
+    },
+    200
+  );
+  if (persRes.ok) {
+    const p = persRes.data.data;
+    console.log(`     -> Target: ${p?.targetProduct?.canonicalTitle} | Recommendations: ${p?.recommendations?.length}`);
+    if (p?.recommendations?.length > 0) {
+      console.log(`     -> Top Personalized Pick: ${p?.recommendations?.[0]?.title} (Score: ${p?.recommendations?.[0]?.personalizedScore})`);
+      console.log(`     -> Top Reason: "${p?.recommendations?.[0]?.reasons?.[0]}"`);
+    }
+  }
+
+  await testReq(
+    'Phase 8.3 Preference-Aware with Empty Preferences',
+    `${BASE_URL}/api/v1/personalized/recommendations`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId: 'apple-iphone-16-128gb-black',
+        preferences: {},
+      }),
+    },
+    200
+  );
+
+  await testReq(
+    'Phase 8.3 Invalid Budget Error (400)',
+    `${BASE_URL}/api/v1/personalized/recommendations`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId: 'apple-iphone-16-128gb-black',
+        preferences: { maxBudget: -500 },
+      }),
+    },
+    400
+  );
+
+  await testReq(
+    'Phase 8.3 Non-Existent Product Error (404)',
+    `${BASE_URL}/api/v1/personalized/recommendations`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId: 'fake-non-existent-product-id',
+        preferences: {},
+      }),
+    },
+    404
+  );
+
+  // 14. Phase 2 Backend APIs Backward Compatibility
   await testReq('Phase 2 Catalog Search', `${BASE_URL}/api/v1/search?q=iphone`, { method: 'GET' }, 200);
   await testReq('Phase 2 All Products', `${BASE_URL}/api/v1/products`, { method: 'GET' }, 200);
   await testReq('Phase 2 Single Product', `${BASE_URL}/api/v1/products/iphone-16`, { method: 'GET' }, 200);
