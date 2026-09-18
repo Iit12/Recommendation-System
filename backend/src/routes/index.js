@@ -8,6 +8,7 @@ import collectRoutes from './collect.routes.js';
 import matchingRoutes from './matching.routes.js';
 import historyRoutes from './history.routes.js';
 import dealRoutes from './deal.routes.js';
+import alternativeRoutes from './alternative.routes.js';
 
 const router = Router();
 
@@ -21,6 +22,7 @@ router.use('/collect', collectRoutes);
 router.use('/matching', matchingRoutes);
 router.use('/history', historyRoutes);
 router.use('/deals', dealRoutes);
+router.use('/alternatives', alternativeRoutes);
 
 export default router;
 

@@ -190,7 +190,43 @@ async function run() {
     404
   );
 
-  // 12. Phase 2 Backend APIs Backward Compatibility
+  // 12. Phase 8.2 Content-Based Alternative Product Recommendation APIs
+  const altRes = await testReq(
+    'Phase 8.2 Alternative Products (GET /api/v1/alternatives/products/:id)',
+    `${BASE_URL}/api/v1/alternatives/products/apple-iphone-16-128gb-black`,
+    { method: 'GET' },
+    200
+  );
+  if (altRes.ok) {
+    const a = altRes.data.data;
+    console.log(`     -> Target: ${a?.targetProduct?.canonicalTitle} | Recommendations: ${a?.recommendations?.length}`);
+    if (a?.recommendations?.length > 0) {
+      console.log(`     -> Top Alternative: ${a?.recommendations?.[0]?.title} (Score: ${a?.recommendations?.[0]?.recommendationScore})`);
+    }
+  }
+
+  await testReq(
+    'Phase 8.2 Alternative Products with Custom Limit (GET /api/v1/alternatives/products/:id?limit=2)',
+    `${BASE_URL}/api/v1/alternatives/products/apple-iphone-16-128gb-black?limit=2`,
+    { method: 'GET' },
+    200
+  );
+
+  await testReq(
+    'Phase 8.2 Invalid Limit Error (400)',
+    `${BASE_URL}/api/v1/alternatives/products/apple-iphone-16-128gb-black?limit=-1`,
+    { method: 'GET' },
+    400
+  );
+
+  await testReq(
+    'Phase 8.2 Non-Existent Product Error (404)',
+    `${BASE_URL}/api/v1/alternatives/products/fake-non-existent-product-id`,
+    { method: 'GET' },
+    404
+  );
+
+  // 13. Phase 2 Backend APIs Backward Compatibility
   await testReq('Phase 2 Catalog Search', `${BASE_URL}/api/v1/search?q=iphone`, { method: 'GET' }, 200);
   await testReq('Phase 2 All Products', `${BASE_URL}/api/v1/products`, { method: 'GET' }, 200);
   await testReq('Phase 2 Single Product', `${BASE_URL}/api/v1/products/iphone-16`, { method: 'GET' }, 200);

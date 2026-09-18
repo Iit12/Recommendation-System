@@ -818,6 +818,104 @@ Calculates deal scores for all active retailer listings of a product, ranks them
 
 ---
 
+### 2.5 Content-Based Alternative Product Recommendation API (Phase 8.2)
+
+Phase 8.2 implements an explainable, deterministic content-based recommendation engine that identifies relevant alternative products from the catalog based on structured specification matching, category alignment, and price budget proximity.
+
+> **Methodology & Heuristic Architecture**:
+> - **Deterministic Content-Based Engine**: Pure specification and pricing compatibility comparison. **No user history, collaborative filtering, or black-box machine learning**.
+> - **Component Weights (Sum = 100)**:
+>   1. `FEATURE_SIMILARITY` ($50\%$): Evaluates structured attributes (Model Family $20\text{ pts}$, Storage $10\text{ pts}$, RAM $8\text{ pts}$, Variant $8\text{ pts}$, Color $4\text{ pts}$).
+>   2. `PRICE_COMPATIBILITY` ($25\%$): Evaluates budget proximity ($\Delta P\% = \frac{|P_{\text{cand}} - P_{\text{target}}|}{P_{\text{target}}} \times 100$). Full 25 points at 0% delta; linearly drops to 0 at $\ge 50\%$ delta.
+>   3. `CATEGORY_COMPATIBILITY` ($15\%$): 15 points for matching category; incompatible categories are filtered out.
+>   4. `BRAND_VARIANT` ($10\%$): Same brand $= 10\text{ pts}$, valid cross-brand alternative $= 5\text{ pts}$.
+> - **Candidate Filtering**: Prevents self-recommendation (target product excluded) and filters out conflicting categories.
+> - **Deterministic Tie-Breaking**:
+>   1. `recommendationScore` descending
+>   2. `currentPrice` ascending (lower price among equal scores)
+>   3. `canonicalId` alphabetical
+
+#### `GET /api/v1/alternatives/products/:productId`
+Calculates content-based alternative product recommendations for a target product.
+
+- **Query Parameters**:
+  - `limit` (*number, optional*): Maximum number of alternative products to return (default `5`, min `1`, max `50`).
+
+- **Example Request**:
+  ```http
+  GET /api/v1/alternatives/products/apple-iphone-16-128gb-black?limit=5
+  ```
+
+- **Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "targetProduct": {
+        "canonicalId": "apple-iphone-16-128gb-black",
+        "canonicalTitle": "Apple Iphone 16 (128GB, Black)",
+        "brand": "apple",
+        "model": "iphone 16",
+        "category": "smartphones",
+        "currentPrice": 68999
+      },
+      "recommendations": [
+        {
+          "rank": 1,
+          "canonicalId": "samsung-galaxy-s25",
+          "title": "Samsung Galaxy S25 5G (Titanium Gray, 256GB Storage)",
+          "brand": "samsung",
+          "model": "galaxy s25",
+          "storage": "256gb",
+          "ram": "12gb",
+          "color": "titanium gray",
+          "variant": "5g",
+          "category": "smartphones",
+          "currentPrice": 74999,
+          "recommendationScore": 79,
+          "breakdown": {
+            "featureSimilarity": 38.0,
+            "priceCompatibility": 21.0,
+            "categoryCompatibility": 15.0,
+            "brandVariantCompatibility": 5.0
+          },
+          "reasons": [
+            "Same product category (Smartphones).",
+            "Comparable current price (₹74,999, within 8.7% of target).",
+            "Cross-brand alternative from Samsung.",
+            "Higher storage capacity (256GB vs 128GB)."
+          ]
+        }
+      ],
+      "metadata": {
+        "candidateCount": 5,
+        "recommendationCount": 1,
+        "limit": 5,
+        "algorithm": "CONTENT_BASED_HEURISTIC",
+        "weights": {
+          "featureSimilarity": 50,
+          "priceCompatibility": 25,
+          "categoryCompatibility": 15,
+          "brandVariantCompatibility": 10
+        },
+        "deterministic": true
+      },
+      "limitations": [
+        "Alternative recommendations are calculated via a deterministic content-based heuristic algorithm, not machine learning or collaborative filtering.",
+        "Recommendations reflect specification similarity and price proximity across canonical products currently in the database.",
+        "Prices and product availability across retailers may change in real time."
+      ]
+    }
+  }
+  ```
+
+- **Possible Errors**:
+  - `400 Bad Request` (`INVALID_PRODUCT_ID`): Product ID is empty or invalid.
+  - `400 Bad Request` (`INVALID_LIMIT`): Limit is not an integer or outside range $[1, 50]$.
+  - `404 Not Found` (`PRODUCT_NOT_FOUND`): Canonical product ID not found in database.
+
+---
+
 ### 2.4 Search API
 
 #### `GET /api/v1/search`
