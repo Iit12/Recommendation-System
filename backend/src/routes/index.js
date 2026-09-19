@@ -11,6 +11,7 @@ import dealRoutes from './deal.routes.js';
 import alternativeRoutes from './alternative.routes.js';
 import personalizedRoutes from './personalized.routes.js';
 import alertRoutes from './alert.routes.js';
+import liveSearchRoutes from './liveSearch.routes.js';
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.use('/deals', dealRoutes);
 router.use('/alternatives', alternativeRoutes);
 router.use('/personalized', personalizedRoutes);
 router.use('/alerts', alertRoutes);
+router.use('/live-search', liveSearchRoutes);
 
 export default router;
 

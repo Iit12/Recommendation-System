@@ -365,7 +365,36 @@ async function run() {
     404
   );
 
-  // 15. Phase 2 Backend APIs Backward Compatibility
+  // 15. Phase 8.5.1 Live Data Acquisition APIs
+  const liveHealthRes = await testReq(
+    'Phase 8.5.1 Live Sources Health Check (GET /api/v1/live-search/health)',
+    `${BASE_URL}/api/v1/live-search/health`,
+    { method: 'GET' },
+    200
+  );
+  if (liveHealthRes.ok) {
+    const h = liveHealthRes.data?.health;
+    console.log(`     -> Live Sources: ${h?.totalSources} | Configured: ${h?.configuredCount} | Status: ${h?.status}`);
+  }
+
+  const liveSearchRes = await testReq(
+    'Phase 8.5.1 Live Search (GET /api/v1/live-search?q=iphone%2016)',
+    `${BASE_URL}/api/v1/live-search?q=iphone%2016`,
+    { method: 'GET' },
+    200
+  );
+  if (liveSearchRes.ok) {
+    console.log(`     -> Mode: ${liveSearchRes.data?.mode} | Amazon Status: ${liveSearchRes.data?.sources?.amazon?.status}`);
+  }
+
+  await testReq(
+    'Phase 8.5.1 Live Search Missing Query Error (400)',
+    `${BASE_URL}/api/v1/live-search`,
+    { method: 'GET' },
+    400
+  );
+
+  // 16. Phase 2 Backend APIs Backward Compatibility
   await testReq('Phase 2 Catalog Search', `${BASE_URL}/api/v1/search?q=iphone`, { method: 'GET' }, 200);
   await testReq('Phase 2 All Products', `${BASE_URL}/api/v1/products`, { method: 'GET' }, 200);
   await testReq('Phase 2 Single Product', `${BASE_URL}/api/v1/products/iphone-16`, { method: 'GET' }, 200);

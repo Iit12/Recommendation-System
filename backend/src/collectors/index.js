@@ -15,6 +15,13 @@ export { InstamartAdapter } from './adapters/instamart.adapter.js';
 export { collectionService } from './collection.service.js';
 export { normalizer } from './normalizer.js';
 
+// Phase 8.5.1 & 8.5.2 Live Data Acquisition Exports
+export { LiveSourceAdapter, SOURCE_TYPES, SOURCE_STATUS } from './adapters/liveSource.adapter.js';
+export { AmazonLiveAdapter } from './adapters/amazon.liveAdapter.js';
+export { QuickCommerceLiveAdapter, QUICKCOMMERCE_SUPPORTED_PLATFORMS } from './adapters/quickcommerce.liveAdapter.js';
+export { liveNormalizer } from './liveNormalizer.js';
+export { LiveSourceManager, liveSourceManager } from './liveSourceManager.js';
+
 /**
  * Adapter Registry mapping storeId to adapter instances
  */
